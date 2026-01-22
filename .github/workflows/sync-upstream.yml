@@ -44,17 +44,42 @@ jobs:
         run: |
           git merge upstream/main --no-edit
 
-      - name: Restore package name
+      - name: Restore fork customizations
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          # Ensure our package name is preserved after merge
+          # Restore package name in packages/coding-agent/package.json
           sed -i 's/"name": "@mariozechner\/pi-coding-agent"/"name": "@vaayne\/pi-coding-agent"/' packages/coding-agent/package.json
 
-      - name: Commit name fix if changed
+          # Restore workspace references in root package.json
+          sed -i 's/-w @mariozechner\/pi-coding-agent/-w @vaayne\/pi-coding-agent/g' package.json
+          sed -i 's/"@mariozechner\/pi-coding-agent":/"@vaayne\/pi-coding-agent":/g' package.json
+
+          # Restore version check URL and install command in interactive-mode.ts
+          sed -i 's|registry.npmjs.org/@mariozechner/pi-coding-agent|registry.npmjs.org/@vaayne/pi-coding-agent|g' packages/coding-agent/src/modes/interactive/interactive-mode.ts
+          sed -i 's|install -g @mariozechner/pi-coding-agent|install -g @vaayne/pi-coding-agent|g' packages/coding-agent/src/modes/interactive/interactive-mode.ts
+          sed -i 's|github.com/badlogic/pi-mono/releases|github.com/vaayne/pi-mono/releases|g' packages/coding-agent/src/modes/interactive/interactive-mode.ts
+
+          # Add @vaayne alias to extension loader if not present
+          if ! grep -q "@vaayne/pi-coding-agent" packages/coding-agent/src/core/extensions/loader.ts; then
+            sed -i '/"@mariozechner\/pi-coding-agent": _bundledPiCodingAgent,/a\	"@vaayne/pi-coding-agent": _bundledPiCodingAgent,' packages/coding-agent/src/core/extensions/loader.ts
+            sed -i '/"@mariozechner\/pi-coding-agent": packageIndex,/a\		"@vaayne/pi-coding-agent": packageIndex,' packages/coding-agent/src/core/extensions/loader.ts
+          fi
+
+          # Add @vaayne paths to tsconfig.json if not present
+          if ! grep -q "@vaayne/pi-coding-agent" tsconfig.json; then
+            sed -i '/"@mariozechner\/pi-coding-agent\/\*":/a\			"@vaayne/pi-coding-agent": ["./packages/coding-agent/src/index.ts"],\n\t\t\t"@vaayne/pi-coding-agent/hooks": ["./packages/coding-agent/src/core/hooks/index.ts"],\n\t\t\t"@vaayne/pi-coding-agent/*": ["./packages/coding-agent/src/*"],' tsconfig.json
+          fi
+
+          # Add @vaayne paths to tsconfig.examples.json if not present
+          if ! grep -q "@vaayne/pi-coding-agent" packages/coding-agent/tsconfig.examples.json; then
+            sed -i '/"@mariozechner\/pi-coding-agent\/hooks":/a\			"@vaayne/pi-coding-agent": ["./src/index.ts"],\n\t\t\t"@vaayne/pi-coding-agent/hooks": ["./src/core/hooks/index.ts"],' packages/coding-agent/tsconfig.examples.json
+          fi
+
+      - name: Commit customizations if changed
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          git add packages/coding-agent/package.json
-          git diff --cached --quiet || git commit -m "chore: restore @vaayne package name after upstream sync"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: restore @vaayne fork customizations after upstream sync"
 
       - name: Push changes
         if: steps.check.outputs.has_changes == 'true'

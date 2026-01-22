@@ -42,7 +42,9 @@ const VIRTUAL_MODULES: Record<string, unknown> = {
 	"@mariozechner/pi-agent-core": _bundledPiAgentCore,
 	"@mariozechner/pi-tui": _bundledPiTui,
 	"@mariozechner/pi-ai": _bundledPiAi,
+	// Support both package names for extensions
 	"@mariozechner/pi-coding-agent": _bundledPiCodingAgent,
+	"@vaayne/pi-coding-agent": _bundledPiCodingAgent,
 };
 
 const require = createRequire(import.meta.url);
@@ -62,7 +64,9 @@ function getAliases(): Record<string, string> {
 	const typeboxRoot = typeboxEntry.replace(/\/build\/cjs\/index\.js$/, "");
 
 	_aliases = {
+		// Support both package names for extensions
 		"@mariozechner/pi-coding-agent": packageIndex,
+		"@vaayne/pi-coding-agent": packageIndex,
 		"@mariozechner/pi-agent-core": require.resolve("@mariozechner/pi-agent-core"),
 		"@mariozechner/pi-tui": require.resolve("@mariozechner/pi-tui"),
 		"@mariozechner/pi-ai": require.resolve("@mariozechner/pi-ai"),
