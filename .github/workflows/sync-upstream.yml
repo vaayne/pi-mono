@@ -1,0 +1,86 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # Daily at 8:00 UTC
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/badlogic/pi-mono.git || true
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Check for new changes
+        id: check
+        run: |
+          UPSTREAM_SHA=$(git rev-parse upstream/main)
+          # Check if upstream has commits not in our main
+          if git merge-base --is-ancestor $UPSTREAM_SHA HEAD; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No new changes from upstream"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "New changes detected from upstream"
+          fi
+
+      - name: Merge upstream
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git merge upstream/main --no-edit
+
+      - name: Restore fork customizations
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          # Restore package name in packages/coding-agent/package.json
+          sed -i 's/"name": "@mariozechner\/pi-coding-agent"/"name": "@vaayne\/pi-coding-agent"/' packages/coding-agent/package.json
+
+          # Restore workspace references in root package.json
+          sed -i 's/-w @mariozechner\/pi-coding-agent/-w @vaayne\/pi-coding-agent/g' package.json
+          sed -i 's/"@mariozechner\/pi-coding-agent":/"@vaayne\/pi-coding-agent":/g' package.json
+
+          # Restore version check URL and install command in interactive-mode.ts
+          sed -i 's|registry.npmjs.org/@mariozechner/pi-coding-agent|registry.npmjs.org/@vaayne/pi-coding-agent|g' packages/coding-agent/src/modes/interactive/interactive-mode.ts
+          sed -i 's|install -g @mariozechner/pi-coding-agent|install -g @vaayne/pi-coding-agent|g' packages/coding-agent/src/modes/interactive/interactive-mode.ts
+          sed -i 's|github.com/badlogic/pi-mono/releases|github.com/vaayne/pi-mono/releases|g' packages/coding-agent/src/modes/interactive/interactive-mode.ts
+
+          # Add @vaayne alias to extension loader if not present
+          if ! grep -q "@vaayne/pi-coding-agent" packages/coding-agent/src/core/extensions/loader.ts; then
+            sed -i '/"@mariozechner\/pi-coding-agent": _bundledPiCodingAgent,/a\	"@vaayne/pi-coding-agent": _bundledPiCodingAgent,' packages/coding-agent/src/core/extensions/loader.ts
+            sed -i '/"@mariozechner\/pi-coding-agent": packageIndex,/a\		"@vaayne/pi-coding-agent": packageIndex,' packages/coding-agent/src/core/extensions/loader.ts
+          fi
+
+          # Add @vaayne paths to tsconfig.json if not present
+          if ! grep -q "@vaayne/pi-coding-agent" tsconfig.json; then
+            sed -i '/"@mariozechner\/pi-coding-agent\/\*":/a\			"@vaayne/pi-coding-agent": ["./packages/coding-agent/src/index.ts"],\n\t\t\t"@vaayne/pi-coding-agent/hooks": ["./packages/coding-agent/src/core/hooks/index.ts"],\n\t\t\t"@vaayne/pi-coding-agent/*": ["./packages/coding-agent/src/*"],' tsconfig.json
+          fi
+
+          # Add @vaayne paths to tsconfig.examples.json if not present
+          if ! grep -q "@vaayne/pi-coding-agent" packages/coding-agent/tsconfig.examples.json; then
+            sed -i '/"@mariozechner\/pi-coding-agent\/hooks":/a\			"@vaayne/pi-coding-agent": ["./src/index.ts"],\n\t\t\t"@vaayne/pi-coding-agent/hooks": ["./src/core/hooks/index.ts"],' packages/coding-agent/tsconfig.examples.json
+          fi
+
+      - name: Commit customizations if changed
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: restore @vaayne fork customizations after upstream sync"
+
+      - name: Push changes
+        if: steps.check.outputs.has_changes == 'true'
+        run: git push origin main

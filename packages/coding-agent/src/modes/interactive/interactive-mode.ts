@@ -561,7 +561,7 @@ export class InteractiveMode {
 		if (process.env.PI_SKIP_VERSION_CHECK) return undefined;
 
 		try {
-			const response = await fetch("https://registry.npmjs.org/@mariozechner/pi-coding-agent/latest");
+			const response = await fetch("https://registry.npmjs.org/@vaayne/pi-coding-agent/latest");
 			if (!response.ok) return undefined;
 
 			const data = (await response.json()) as { version?: string };
@@ -2419,8 +2419,8 @@ export class InteractiveMode {
 
 	showNewVersionNotification(newVersion: string): void {
 		const action = isBunBinary
-			? `Download from: ${theme.fg("accent", "https://github.com/badlogic/pi-mono/releases/latest")}`
-			: `Run: ${theme.fg("accent", `${isBunRuntime ? "bun" : "npm"} install -g @mariozechner/pi-coding-agent`)}`;
+			? `Download from: ${theme.fg("accent", "https://github.com/vaayne/pi-mono/releases/latest")}`
+			: `Run: ${theme.fg("accent", `${isBunRuntime ? "bun" : "npm"} install -g @vaayne/pi-coding-agent`)}`;
 		const updateInstruction = theme.fg("muted", `New version ${newVersion} is available. `) + action;
 
 		this.chatContainer.addChild(new Spacer(1));
