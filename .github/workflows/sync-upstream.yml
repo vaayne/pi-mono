@@ -1,0 +1,61 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # Daily at 8:00 UTC
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/badlogic/pi-mono.git || true
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Check for new changes
+        id: check
+        run: |
+          UPSTREAM_SHA=$(git rev-parse upstream/main)
+          # Check if upstream has commits not in our main
+          if git merge-base --is-ancestor $UPSTREAM_SHA HEAD; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No new changes from upstream"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "New changes detected from upstream"
+          fi
+
+      - name: Merge upstream
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git merge upstream/main --no-edit
+
+      - name: Restore package name
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          # Ensure our package name is preserved after merge
+          sed -i 's/"name": "@mariozechner\/pi-coding-agent"/"name": "@vaayne\/pi-coding-agent"/' packages/coding-agent/package.json
+
+      - name: Commit name fix if changed
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git add packages/coding-agent/package.json
+          git diff --cached --quiet || git commit -m "chore: restore @vaayne package name after upstream sync"
+
+      - name: Push changes
+        if: steps.check.outputs.has_changes == 'true'
+        run: git push origin main

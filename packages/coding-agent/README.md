@@ -5,9 +5,11 @@
 </p>
 <p align="center">
   <a href="https://discord.com/invite/nKXTsAcmbT"><img alt="Discord" src="https://img.shields.io/badge/discord-community-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-  <a href="https://www.npmjs.com/package/@mariozechner/pi-coding-agent"><img alt="npm" src="https://img.shields.io/npm/v/@mariozechner/pi-coding-agent?style=flat-square" /></a>
-  <a href="https://github.com/badlogic/pi-mono/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/badlogic/pi-mono/ci.yml?style=flat-square&branch=main" /></a>
+  <a href="https://www.npmjs.com/package/@vaayne/pi-coding-agent"><img alt="npm" src="https://img.shields.io/npm/v/@vaayne/pi-coding-agent?style=flat-square" /></a>
+  <a href="https://github.com/vaayne/pi-mono/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/vaayne/pi-mono/ci.yml?style=flat-square&branch=main" /></a>
 </p>
+
+> **Note:** This is a fork of [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono) published as `@vaayne/pi-coding-agent`. It syncs daily with the upstream repository and maintains version parity. See [Fork Information](#fork-information) for details.
 
 A terminal-based coding agent with multi-model support, mid-session model switching, and a simple CLI for headless coding tasks.
 
@@ -51,6 +53,7 @@ Works on Linux, macOS, and Windows (requires bash; see [Windows Setup](#windows-
   - [HTML Export](#html-export)
 - [Philosophy](#philosophy)
 - [Development](#development)
+- [Fork Information](#fork-information)
 - [License](#license)
 
 ---
@@ -62,7 +65,7 @@ Works on Linux, macOS, and Windows (requires bash; see [Windows Setup](#windows-
 **npm (recommended):**
 
 ```bash
-npm install -g @mariozechner/pi-coding-agent
+npm install -g @vaayne/pi-coding-agent
 ```
 
 **Standalone binary:**
@@ -1472,6 +1475,39 @@ Never use `__dirname` directly for package assets.
 ### Debug Command
 
 `/debug` (hidden) writes rendered lines with ANSI codes to `~/.pi/agent/pi-debug.log` for TUI debugging, as well as the last set of messages that were sent to the LLM.
+
+---
+
+## Fork Information
+
+This package (`@vaayne/pi-coding-agent`) is a fork of the original [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono).
+
+### Why This Fork?
+
+This fork exists to publish the package under a different npm scope while maintaining full compatibility with the upstream project.
+
+### Upstream Sync
+
+This fork automatically syncs with the upstream repository daily via GitHub Actions:
+
+- **Schedule:** Daily at 8:00 UTC
+- **Process:** Merges upstream changes and preserves the `@vaayne` package name
+- **Version parity:** Versions match the upstream release
+
+### Installation
+
+```bash
+npm install -g @vaayne/pi-coding-agent
+```
+
+### Differences from Upstream
+
+- Package name: `@vaayne/pi-coding-agent` instead of `@mariozechner/pi-coding-agent`
+- All other functionality, dependencies, and versions remain identical
+
+### Contributing
+
+For feature requests and bug reports, please contribute to the [upstream repository](https://github.com/badlogic/pi-mono).
 
 ---
 

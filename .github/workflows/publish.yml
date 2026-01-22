@@ -1,0 +1,53 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (skip actual publish)"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check package name
+        run: |
+          NAME=$(node -p "require('./packages/coding-agent/package.json').name")
+          if [ "$NAME" != "@vaayne/pi-coding-agent" ]; then
+            echo "Error: Package name is $NAME, expected @vaayne/pi-coding-agent"
+            exit 1
+          fi
+          echo "Package name verified: $NAME"
+
+      - name: Publish (dry run)
+        if: inputs.dry_run == true
+        run: |
+          cd packages/coding-agent
+          npm publish --access public --dry-run
+
+      - name: Publish
+        if: inputs.dry_run != true
+        run: |
+          cd packages/coding-agent
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
