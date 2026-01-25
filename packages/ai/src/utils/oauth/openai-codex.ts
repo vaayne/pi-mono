@@ -8,7 +8,7 @@
 // NEVER convert to top-level imports - breaks browser/Vite builds (web-ui)
 let _randomBytes: typeof import("node:crypto").randomBytes | null = null;
 let _http: typeof import("node:http") | null = null;
-if (typeof process !== "undefined" && process.versions?.node) {
+if (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {
 	import("node:crypto").then((m) => {
 		_randomBytes = m.randomBytes;
 	});
@@ -18,7 +18,7 @@ if (typeof process !== "undefined" && process.versions?.node) {
 }
 
 import { generatePKCE } from "./pkce.js";
-import type { OAuthCredentials, OAuthPrompt } from "./types.js";
+import type { OAuthCredentials, OAuthLoginCallbacks, OAuthPrompt, OAuthProviderInterface } from "./types.js";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize";
@@ -430,3 +430,26 @@ export async function refreshOpenAICodexToken(refreshToken: string): Promise<OAu
 		accountId,
 	};
 }
+
+export const openaiCodexOAuthProvider: OAuthProviderInterface = {
+	id: "openai-codex",
+	name: "ChatGPT Plus/Pro (Codex Subscription)",
+	usesCallbackServer: true,
+
+	async login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials> {
+		return loginOpenAICodex({
+			onAuth: callbacks.onAuth,
+			onPrompt: callbacks.onPrompt,
+			onProgress: callbacks.onProgress,
+			onManualCodeInput: callbacks.onManualCodeInput,
+		});
+	},
+
+	async refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials> {
+		return refreshOpenAICodexToken(credentials.refresh);
+	},
+
+	getApiKey(credentials: OAuthCredentials): string {
+		return credentials.access;
+	},
+};

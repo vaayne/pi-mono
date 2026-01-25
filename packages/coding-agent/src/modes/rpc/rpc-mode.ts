@@ -256,71 +256,12 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 	// Set up extensions with RPC-based UI context
 	const extensionRunner = session.extensionRunner;
 	if (extensionRunner) {
-		extensionRunner.initialize(
-			// ExtensionActions
-			{
-				sendMessage: (message, options) => {
-					session.sendCustomMessage(message, options).catch((e) => {
-						output(error(undefined, "extension_send", e.message));
-					});
-				},
-				sendUserMessage: (content, options) => {
-					session.sendUserMessage(content, options).catch((e) => {
-						output(error(undefined, "extension_send_user", e.message));
-					});
-				},
-				appendEntry: (customType, data) => {
-					session.sessionManager.appendCustomEntry(customType, data);
-				},
-				setSessionName: (name) => {
-					session.sessionManager.appendSessionInfo(name);
-				},
-				getSessionName: () => {
-					return session.sessionManager.getSessionName();
-				},
-				setLabel: (entryId, label) => {
-					session.sessionManager.appendLabelChange(entryId, label);
-				},
-				getActiveTools: () => session.getActiveToolNames(),
-				getAllTools: () => session.getAllTools(),
-				setActiveTools: (toolNames: string[]) => session.setActiveToolsByName(toolNames),
-				setModel: async (model) => {
-					const key = await session.modelRegistry.getApiKey(model);
-					if (!key) return false;
-					await session.setModel(model);
-					return true;
-				},
-				getThinkingLevel: () => session.thinkingLevel,
-				setThinkingLevel: (level) => session.setThinkingLevel(level),
-			},
-			// ExtensionContextActions
-			{
-				getModel: () => session.agent.state.model,
-				isIdle: () => !session.isStreaming,
-				abort: () => session.abort(),
-				hasPendingMessages: () => session.pendingMessageCount > 0,
-				shutdown: () => {
-					shutdownRequested = true;
-				},
-				getContextUsage: () => session.getContextUsage(),
-				compact: (options) => {
-					void (async () => {
-						try {
-							const result = await session.compact(options?.customInstructions);
-							options?.onComplete?.(result);
-						} catch (error) {
-							const err = error instanceof Error ? error : new Error(String(error));
-							options?.onError?.(err);
-						}
-					})();
-				},
-			},
-			// ExtensionCommandContextActions - commands invokable via prompt("/command")
-			{
+		await session.bindExtensions({
+			uiContext: createExtensionUIContext(),
+			commandContextActions: {
 				waitForIdle: () => session.agent.waitForIdle(),
 				newSession: async (options) => {
 					const success = await session.newSession({ parentSession: options?.parentSession });
-					// Note: setup callback runs but no UI feedback in RPC mode
 					if (success && options?.setup) {
 						await options.setup(session.sessionManager);
 					}
@@ -340,14 +281,12 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 					return { cancelled: result.cancelled };
 				},
 			},
-			createExtensionUIContext(),
-		);
-		extensionRunner.onError((err) => {
-			output({ type: "extension_error", extensionPath: err.extensionPath, event: err.event, error: err.error });
-		});
-		// Emit session_start event
-		await extensionRunner.emit({
-			type: "session_start",
+			shutdownHandler: () => {
+				shutdownRequested = true;
+			},
+			onError: (err) => {
+				output({ type: "extension_error", extensionPath: err.extensionPath, event: err.event, error: err.error });
+			},
 		});
 	}
 
@@ -426,7 +365,7 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 			// =================================================================
 
 			case "set_model": {
-				const models = await session.getAvailableModels();
+				const models = await session.modelRegistry.getAvailable();
 				const model = models.find((m) => m.provider === command.provider && m.id === command.modelId);
 				if (!model) {
 					return error(id, "set_model", `Model not found: ${command.provider}/${command.modelId}`);
@@ -444,7 +383,7 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 			}
 
 			case "get_available_models": {
-				const models = await session.getAvailableModels();
+				const models = await session.modelRegistry.getAvailable();
 				return success(id, "get_available_models", { models });
 			}
 
@@ -577,8 +516,9 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 	async function checkShutdownRequested(): Promise<void> {
 		if (!shutdownRequested) return;
 
-		if (extensionRunner?.hasHandlers("session_shutdown")) {
-			await extensionRunner.emit({ type: "session_shutdown" });
+		const currentRunner = session.extensionRunner;
+		if (currentRunner?.hasHandlers("session_shutdown")) {
+			await currentRunner.emit({ type: "session_shutdown" });
 		}
 
 		// Close readline interface to stop waiting for input

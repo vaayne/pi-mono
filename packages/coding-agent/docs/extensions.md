@@ -115,9 +115,56 @@ Additional paths via `settings.json`:
 
 ```json
 {
-  "extensions": ["/path/to/extension.ts", "/path/to/extension/dir"]
+  "packages": [
+    "npm:@foo/bar@1.0.0",
+    "git:github.com/user/repo@v1"
+  ],
+  "extensions": [
+    "/path/to/local/extension.ts",
+    "/path/to/local/extension/dir"
+  ]
 }
 ```
+
+Use `pi install`, `pi remove`, `pi list`, and `pi update` to manage packages:
+
+```bash
+pi install npm:@foo/bar@1.0.0
+pi install git:github.com/user/repo@v1
+pi install https://github.com/user/repo  # raw URLs work too
+pi remove npm:@foo/bar
+pi list    # show installed packages
+pi update  # update all non-pinned packages
+```
+
+**Package filtering:** By default, packages load all resources (extensions, skills, prompts, themes). To selectively load only certain resources:
+
+```json
+{
+  "packages": [
+    "npm:simple-pkg",
+    {
+      "source": "npm:shitty-extensions",
+      "extensions": ["extensions/oracle.ts", "extensions/memory-mode.ts"],
+      "skills": ["skills/a-nach-b"],
+      "themes": [],
+      "prompts": []
+    }
+  ]
+}
+```
+
+- Omit a key to load all of that type from the package
+- Use empty array `[]` to load none of that type
+- Paths are relative to package root
+- Use `!pattern` to exclude (e.g., `"themes": ["!funky.json"]`)
+- Glob patterns supported via minimatch (e.g., `"extensions": ["**/*.ts", "!**/deprecated/*"]`)
+- **Layered filtering:** User filters apply on top of manifest filters. If a manifest excludes 10 extensions and user adds one more exclusion, all 11 are excluded.
+
+**Package deduplication:** If the same package appears in both global (`~/.pi/agent/settings.json`) and project (`.pi/settings.json`) settings, the project version wins and the global one is ignored. This prevents duplicate resource collisions when you have the same package installed at both scopes. Package identity is determined by:
+- **npm packages:** Package name (e.g., `npm:foo` and `npm:foo@1.0.0` are the same identity)
+- **git packages:** Repository URL without ref (e.g., `git:github.com/user/repo` and `git:github.com/user/repo@v1` are the same identity)
+- **local paths:** Resolved absolute path
 
 **Discovery rules:**
 
@@ -146,13 +193,70 @@ Additional paths via `settings.json`:
     "zod": "^3.0.0"
   },
   "pi": {
-    "extensions": ["./src/safety-gates.ts", "./src/custom-tools.ts"]
+    "extensions": ["./src/safety-gates.ts", "./src/custom-tools.ts"],
+    "skills": ["./skills/"],
+    "prompts": ["./prompts/"],
+    "themes": ["./themes/dark.json"]
   }
 }
 ```
 
+The pi manifest supports glob patterns and exclusions:
+
+```json
+{
+  "pi": {
+    "extensions": ["./extensions", "!**/deprecated/*"],
+    "skills": ["./skills", "!**/experimental/*"],
+    "themes": ["./themes/*.json"]
+  }
+}
+```
+
+**Bundling other pi packages:**
+
+To include resources from another pi package, add it as a dependency with `bundledDependencies` to ensure it's embedded in your published tarball:
+
+```json
+{
+  "name": "my-extension-pack",
+  "dependencies": {
+    "other-pi-package": "^1.0.0"
+  },
+  "bundledDependencies": [
+    "other-pi-package"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions",
+      "./node_modules/other-pi-package/extensions",
+      "!**/unwanted-extension.ts"
+    ],
+    "skills": [
+      "./skills",
+      "./node_modules/other-pi-package/skills"
+    ]
+  }
+}
+```
+
+`bundledDependencies` embeds the package inside your tarball, preserving the `node_modules/` structure. Without it, npm's hoisting could move the dependency elsewhere, breaking the paths.
+
+**Discoverability:** Add the `pi-package` keyword to your `package.json` so users can find your package on npm:
+
+```json
+{
+  "name": "my-extension-pack",
+  "keywords": ["pi-package", "pi-extension", "..."],
+  ...
+}
+```
+
+Search for pi packages: `curl -s "https://registry.npmjs.org/-/v1/search?text=keywords:pi-package"`
+
 The `package.json` approach enables:
 - Multiple extensions from one package
+- Skills, prompts, and themes declared alongside extensions
 - Third-party npm dependencies (resolved via jiti)
 - Nested source structure (no depth limit within the package)
 - Deployment to and installation from npm
@@ -456,7 +560,7 @@ pi.on("agent_end", async (event, ctx) => {
 });
 ```
 
-**Examples:** [chalk-logger.ts](../examples/extensions/chalk-logger.ts), [git-checkpoint.ts](../examples/extensions/git-checkpoint.ts), [plan-mode/index.ts](../examples/extensions/plan-mode/index.ts)
+**Examples:** [git-checkpoint.ts](../examples/extensions/git-checkpoint.ts), [plan-mode/index.ts](../examples/extensions/plan-mode/index.ts)
 
 #### turn_start / turn_end
 
@@ -531,7 +635,7 @@ pi.on("tool_call", async (event, ctx) => {
 });
 ```
 
-**Examples:** [chalk-logger.ts](../examples/extensions/chalk-logger.ts), [permission-gate.ts](../examples/extensions/permission-gate.ts), [plan-mode/index.ts](../examples/extensions/plan-mode/index.ts), [protected-paths.ts](../examples/extensions/protected-paths.ts)
+**Examples:** [permission-gate.ts](../examples/extensions/permission-gate.ts), [plan-mode/index.ts](../examples/extensions/plan-mode/index.ts), [protected-paths.ts](../examples/extensions/protected-paths.ts)
 
 #### tool_result
 
@@ -1053,6 +1157,70 @@ Shared event bus for communication between extensions:
 pi.events.on("my:event", (data) => { ... });
 pi.events.emit("my:event", { ... });
 ```
+
+### pi.registerProvider(name, config)
+
+Register or override a model provider dynamically. Useful for proxies, custom endpoints, or team-wide model configurations.
+
+```typescript
+// Register a new provider with custom models
+pi.registerProvider("my-proxy", {
+  baseUrl: "https://proxy.example.com",
+  apiKey: "PROXY_API_KEY",  // env var name or literal
+  api: "anthropic-messages",
+  models: [
+    {
+      id: "claude-sonnet-4-20250514",
+      name: "Claude 4 Sonnet (proxy)",
+      reasoning: false,
+      input: ["text", "image"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200000,
+      maxTokens: 16384
+    }
+  ]
+});
+
+// Override baseUrl for an existing provider (keeps all models)
+pi.registerProvider("anthropic", {
+  baseUrl: "https://proxy.example.com"
+});
+
+// Register provider with OAuth support for /login
+pi.registerProvider("corporate-ai", {
+  baseUrl: "https://ai.corp.com",
+  api: "openai-responses",
+  models: [...],
+  oauth: {
+    name: "Corporate AI (SSO)",
+    async login(callbacks) {
+      // Custom OAuth flow
+      callbacks.onAuth({ url: "https://sso.corp.com/..." });
+      const code = await callbacks.onPrompt({ message: "Enter code:" });
+      return { refresh: code, access: code, expires: Date.now() + 3600000 };
+    },
+    async refreshToken(credentials) {
+      // Refresh logic
+      return credentials;
+    },
+    getApiKey(credentials) {
+      return credentials.access;
+    }
+  }
+});
+```
+
+**Config options:**
+- `baseUrl` - API endpoint URL. Required when defining models.
+- `apiKey` - API key or environment variable name. Required when defining models (unless `oauth` provided).
+- `api` - API type: `"anthropic-messages"`, `"openai-completions"`, `"openai-responses"`, etc.
+- `headers` - Custom headers to include in requests.
+- `authHeader` - If true, adds `Authorization: Bearer` header automatically.
+- `models` - Array of model definitions. If provided, replaces all existing models for this provider.
+- `oauth` - OAuth provider config for `/login` support. When provided, the provider appears in the login menu.
+- `streamSimple` - Custom streaming implementation for non-standard APIs.
+
+See [custom-provider.md](custom-provider.md) for advanced topics: custom streaming APIs, OAuth details, model definition reference.
 
 ## State Management
 

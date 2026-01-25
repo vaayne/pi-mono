@@ -32,6 +32,7 @@ import type {
 	ExtensionRuntime,
 	LoadExtensionsResult,
 	MessageRenderer,
+	ProviderConfig,
 	RegisteredCommand,
 	ToolDefinition,
 } from "./types.js";
@@ -105,7 +106,7 @@ type HandlerFn = (...args: unknown[]) => Promise<unknown>;
 
 /**
  * Create a runtime with throwing stubs for action methods.
- * Runner.initialize() replaces these with real implementations.
+ * Runner.bindCore() replaces these with real implementations.
  */
 export function createExtensionRuntime(): ExtensionRuntime {
 	const notInitialized = () => {
@@ -126,6 +127,7 @@ export function createExtensionRuntime(): ExtensionRuntime {
 		getThinkingLevel: notInitialized,
 		setThinkingLevel: notInitialized,
 		flagValues: new Map(),
+		pendingProviderRegistrations: [],
 	};
 }
 
@@ -242,6 +244,10 @@ function createExtensionAPI(
 			runtime.setThinkingLevel(level);
 		},
 
+		registerProvider(name: string, config: ProviderConfig) {
+			runtime.pendingProviderRegistrations.push({ name, config });
+		},
+
 		events: eventBus,
 	} as ExtensionAPI;
 
@@ -250,6 +256,7 @@ function createExtensionAPI(
 
 async function loadExtensionModule(extensionPath: string) {
 	const jiti = createJiti(import.meta.url, {
+		moduleCache: false,
 		// In Bun binary: use virtualModules for bundled packages (no filesystem resolution)
 		// Also disable tryNative so jiti handles ALL imports (not just the entry point)
 		// In Node.js/dev: use aliases to resolve to node_modules paths
@@ -351,6 +358,7 @@ interface PiManifest {
 	extensions?: string[];
 	themes?: string[];
 	skills?: string[];
+	prompts?: string[];
 }
 
 function readPiManifest(packageJsonPath: string): PiManifest | null {
@@ -489,11 +497,15 @@ export async function discoverAndLoadExtensions(
 	for (const p of configuredPaths) {
 		const resolved = resolvePath(p, cwd);
 		if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+			// Check for package.json with pi manifest or index.ts
 			const entries = resolveExtensionEntries(resolved);
 			if (entries) {
 				addPaths(entries);
 				continue;
 			}
+			// No explicit entries - discover individual files in directory
+			addPaths(discoverExtensionsInDir(resolved));
+			continue;
 		}
 
 		addPaths([resolved]);

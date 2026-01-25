@@ -88,12 +88,18 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 |-----------|-------------|
 | `mac-system-theme.ts` | Syncs pi theme with macOS dark/light mode |
 
+### Custom Providers
+
+| Extension | Description |
+|-----------|-------------|
+| `custom-provider-anthropic/` | Custom Anthropic provider with OAuth support and custom streaming implementation |
+| `custom-provider-gitlab-duo/` | GitLab Duo provider using pi-ai's built-in Anthropic/OpenAI streaming via proxy |
+
 ### External Dependencies
 
 | Extension | Description |
 |-----------|-------------|
-| `chalk-logger.ts` | Uses chalk from parent node_modules (demonstrates jiti module resolution) |
-| `with-deps/` | Extension with its own package.json and dependencies |
+| `with-deps/` | Extension with its own package.json and dependencies (demonstrates jiti module resolution) |
 | `file-trigger.ts` | Watches a trigger file and injects contents into conversation |
 
 ## Writing Extensions

@@ -8,7 +8,9 @@ export {
 	type AgentSessionEvent,
 	type AgentSessionEventListener,
 	type ModelCycleResult,
+	type ParsedSkillBlock,
 	type PromptOptions,
+	parseSkillBlock,
 	type SessionStats,
 } from "./core/agent-session.js";
 // Auth and model registry
@@ -74,6 +76,8 @@ export type {
 	LoadExtensionsResult,
 	MessageRenderer,
 	MessageRenderOptions,
+	ProviderConfig,
+	ProviderModelConfig,
 	RegisteredCommand,
 	RegisteredTool,
 	SessionBeforeCompactEvent,
@@ -98,6 +102,7 @@ export type {
 	WidgetPlacement,
 } from "./core/extensions/index.js";
 export {
+	createExtensionRuntime,
 	ExtensionRunner,
 	isBashToolResult,
 	isEditToolResult,
@@ -115,10 +120,18 @@ export {
 export type { ReadonlyFooterDataProvider } from "./core/footer-data-provider.js";
 export { convertToLlm } from "./core/messages.js";
 export { ModelRegistry } from "./core/model-registry.js";
+export type {
+	PackageManager,
+	PathMetadata,
+	ProgressCallback,
+	ProgressEvent,
+	ResolvedPaths,
+} from "./core/package-manager.js";
+export { DefaultPackageManager } from "./core/package-manager.js";
+export type { ResourceCollision, ResourceDiagnostic, ResourceLoader } from "./core/resource-loader.js";
+export { DefaultResourceLoader } from "./core/resource-loader.js";
 // SDK for programmatic usage
 export {
-	type BuildSystemPromptOptions,
-	buildSystemPrompt,
 	type CreateAgentSessionOptions,
 	type CreateAgentSessionResult,
 	// Factory
@@ -133,14 +146,6 @@ export {
 	createReadOnlyTools,
 	createReadTool,
 	createWriteTool,
-	// Discovery
-	discoverAuthStorage,
-	discoverContextFiles,
-	discoverExtensions,
-	discoverModels,
-	discoverPromptTemplates,
-	discoverSkills,
-	loadSettings,
 	type PromptTemplate,
 	// Pre-built tools (use process.cwd())
 	readOnlyTools,
@@ -171,10 +176,9 @@ export {
 export {
 	type CompactionSettings,
 	type ImageSettings,
+	type PackageSource,
 	type RetrySettings,
-	type Settings,
 	SettingsManager,
-	type SkillsSettings,
 } from "./core/settings-manager.js";
 // Skills
 export {
@@ -185,7 +189,6 @@ export {
 	loadSkillsFromDir,
 	type Skill,
 	type SkillFrontmatter,
-	type SkillWarning,
 } from "./core/skills.js";
 // Tools
 export {
@@ -267,6 +270,7 @@ export {
 	type SettingsConfig,
 	SettingsSelectorComponent,
 	ShowImagesSelectorComponent,
+	SkillInvocationMessageComponent,
 	ThemeSelectorComponent,
 	ThinkingSelectorComponent,
 	ToolExecutionComponent,
@@ -288,6 +292,8 @@ export {
 	Theme,
 	type ThemeColor,
 } from "./modes/interactive/theme/theme.js";
+// Clipboard utilities
+export { copyToClipboard } from "./utils/clipboard.js";
 export { parseFrontmatter, stripFrontmatter } from "./utils/frontmatter.js";
 // Shell utilities
 export { getShellConfig } from "./utils/shell.js";
